@@ -1,0 +1,8 @@
+# Everything a deployment writes into its own checkout. None of it belongs in this repository,
+# and the two at the top are why: one is every secret the panel holds, the other is this host's
+# private key.
+.env.production
+.env
+certs/
+compose.override.yaml
+one-ca-bundle.pem

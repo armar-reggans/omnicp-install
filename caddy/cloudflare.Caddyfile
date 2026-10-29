@@ -1,0 +1,77 @@
+# TLS mode: cloudflare  (TLS_MODE=cloudflare).
+#
+# For a panel behind Cloudflare's proxy — the orange cloud. Two TLS connections exist: browser to
+# Cloudflare (their certificate, nothing to do here) and Cloudflare to this host (the certificate
+# below). Set the SSL/TLS encryption mode to **Full (strict)**; "Flexible" means Cloudflare speaks
+# plain HTTP to this origin, the session cookie is `secure`, and every sign-in silently fails.
+#
+# The certificate is a Cloudflare **Origin Certificate** — Cloudflare dashboard → SSL/TLS → Origin
+# Server → Create Certificate, 15-year validity. Save it as TLS_CERT_DIR/panel.crt and the key as
+# panel.key. It is trusted by Cloudflare and by nothing else, which is correct: nothing else is
+# supposed to connect. ACME is not used here because the HTTP-01 challenge would be answered by
+# Cloudflare rather than by this host.
+#
+# ═══ The client address — read this before changing anything below ═══════════════════
+#
+# This is the mode where getting it wrong is silent and total.
+#
+# Every request now arrives from a Cloudflare edge address, so `{remote_host}` is a Cloudflare IP,
+# the same one for thousands of unrelated people. The panel keys its login rate limit
+# on what it sees as the client (`auth.login.ip`), so attributing every request to one
+# address puts THE ENTIRE USER BASE IN A SINGLE BUCKET: a few failed sign-ins by anyone lock out
+# everyone, and the audit log records a Cloudflare IP for every action ever taken here.
+#
+# So the address comes from `CF-Connecting-IP`, which Cloudflare sets to the real client and — this
+# is the part that makes it usable — OVERWRITES rather than appends, so a client cannot inject it.
+#
+# `X-Forwarded-For` is deliberately NOT used as the source, even though Cloudflare sets that too:
+# Cloudflare appends to whatever XFF the client sent, so its leftmost entry — which is what
+# `clientIp()` reads — is attacker-chosen. That distinction is the whole reason this file exists.
+#
+# And `CF-Connecting-IP` is only meaningful on a request that genuinely came from Cloudflare.
+# Anyone who learns this host's address could otherwise connect directly and name their own client
+# IP. Hence the guard: connections from outside Cloudflare's published ranges are refused before
+# any header is read. It is the guard, not the header, that does the securing.
+#
+# Two things to do outside this file, because a guard on the address is not a guarantee of origin:
+#
+#   1. Firewall this host so that only Cloudflare's ranges reach :443 at all. The list below is
+#      defence in depth; the firewall is the actual perimeter.
+#   2. Turn on Authenticated Origin Pulls (SSL/TLS → Origin Server), which makes Cloudflare present
+#      a client certificate. See the commented `client_auth` block below to enforce it here.
+
+import common.caddy
+
+{$PANEL_DOMAIN} {
+	tls /certs/panel.crt /certs/panel.key {
+		# ── Authenticated Origin Pulls ──────────────────────────────────────────────
+		# Uncomment once it is enabled in the Cloudflare dashboard, having first downloaded
+		# Cloudflare's origin-pull CA to TLS_CERT_DIR/cloudflare-origin-pull-ca.pem:
+		#
+		#   curl -o certs/cloudflare-origin-pull-ca.pem \
+		#     https://developers.cloudflare.com/ssl/static/authenticated_origin_pull_ca.pem
+		#
+		# This is stronger than the address guard below — it proves the peer holds Cloudflare's
+		# key rather than merely sitting at one of their addresses.
+		#
+		# client_auth {
+		# 	mode require_and_verify
+		# 	trust_pool file /certs/cloudflare-origin-pull-ca.pem
+		# }
+	}
+
+	# Anything not from Cloudflare is refused before a single header is trusted. `abort` closes the
+	# connection without a response, which tells a scanner nothing about what is here.
+	#
+	# The list is Cloudflare's published edge — https://www.cloudflare.com/ips/, checked 2026-09-18 —
+	# and it DOES change. Re-check it when adding this host to a new Cloudflare account and after any
+	# Cloudflare notice about IP changes; a stale list shows up as legitimate traffic getting nothing
+	# back at all, which looks like an outage rather than a configuration error.
+	@direct not remote_ip 173.245.48.0/20 103.21.244.0/22 103.22.200.0/22 103.31.4.0/22 141.101.64.0/18 108.162.192.0/18 190.93.240.0/20 188.114.96.0/20 197.234.240.0/22 198.41.128.0/17 162.158.0.0/15 104.16.0.0/13 104.24.0.0/14 172.64.0.0/13 131.0.72.0/22 2400:cb00::/32 2606:4700::/32 2803:f800::/32 2405:b500::/32 2405:8100::/32 2a06:98c0::/29 2c0f:f248::/32
+	abort @direct
+
+	# `CF-Connecting-IP`, not `{remote_host}` and not `X-Forwarded-For`. See the header of this file
+	# — this single argument is the difference between a working rate limiter and one bucket for
+	# every user of the panel.
+	import panel_common {header.CF-Connecting-IP} {scheme}
+}

@@ -1,0 +1,76 @@
+# ── Per-site compose settings ────────────────────────────────────────────────────────
+#
+# Copy to `compose.override.yaml` and edit. `docker compose` merges it on top of
+# `compose.yaml` automatically — no `-f` flag, nothing to remember on the command line.
+#
+#     cp compose.override.yaml.example compose.override.yaml
+#
+# This file is the ONLY supported place for a setting that is true of one deployment and not
+# of the others. `compose.override.yaml` is gitignored, so it survives every `git pull` and
+# never appears in a diff.
+#
+# ── Why not just edit compose.yaml ───────────────────────────────────────────────────
+#
+# Because the host then carries a commit nobody else has, and `git pull --rebase` in
+# `scripts/update.sh` has to replay it on every single deployment. That works until it
+# doesn't: the day it conflicts is the day an operator resolves a merge by hand, at speed,
+# on production, against a file they did not write.
+#
+#
+# Keep it in one file, keep that file here.
+
+services:
+  # ── A resolver for the panel's own internal names ──────────────────────────────────
+  #
+  # Needed when `oned`, vCenter, an Oxide rack or a backup endpoint is reachable only by a
+  # name your site's DNS knows. Without this the containers inherit the host's
+  # `/etc/resolv.conf`, which on most installs is a public resolver that has never heard of
+  # them.
+  #
+  # Note what this does NOT change: Docker's embedded resolver at 127.0.0.11 still answers
+  # for compose service names (`panel`, `postgres`, `gatus`), because `dns:` sets the
+  # UPSTREAM servers it forwards to rather than replacing it. Service discovery is safe.
+  panel:
+    dns: [10.0.0.53]
+  reconciler:
+    dns: [10.0.0.53]
+  console-proxy:
+    dns: [10.0.0.53]
+  tools:
+    dns: [10.0.0.53]
+
+  # ── Uptime monitoring is deliberately absent from the list above ───────────────────
+  #
+  # `monitor-worker` and `gatus` resolve the hostnames TENANTS type, which are internet
+  # names and should be resolved the way the internet sees them. A split-horizon zone that
+  # answers differently for a domain a tenant legitimately monitors would otherwise make the
+  # panel refuse a target that is genuinely public, or check an address nobody else reaches.
+  #
+  # If this site does need monitoring to use a particular nameserver, set it at
+  # /admin/monitoring rather than here. That setting reaches the authorisation path and the
+  # engine together; a `dns:` line here would reach only the engine, and only for the monitor
+  # kinds the renderer cannot pin.
+
+  # ── Other things that legitimately live here ───────────────────────────────────────
+  #
+  # Publishing a port on a host where Caddy is not the front door:
+  #
+  #   panel:
+  #     ports: ['127.0.0.1:3000:3000']
+  #
+  # Pinning the stack to one NUMA-light host, or widening a limit for a large estate:
+  #
+  #   reconciler:
+  #     deploy:
+  #       resources:
+  #         limits:
+  #           memory: 1G
+  #
+  # An extra CA the panel must trust, where a region presents a private certificate:
+  #
+  #   panel:
+  #     volumes:
+  #       - /etc/ssl/site-ca.pem:/app/certs/site-ca.pem:ro
+  #
+  # What does NOT belong here: anything secret. Environment variables with credentials go in
+  # `.env.production`, which is gitignored for the same reason and backed up separately.

@@ -1,0 +1,79 @@
+# Everything the three TLS modes share.
+#
+# EDITING THIS FILE IS NOT ENOUGH. Caddy reads it once, at start, and `docker compose up -d` does
+# not recreate a container just because a file it mounts has changed — compose compares the service
+# DEFINITION, and the contents of a bind mount are invisible to it. After any change here:
+#
+#     docker compose --env-file .env.production restart caddy
+#
+# Skipping that is how a console route gets deployed and still does not serve.
+#
+# Imported by acme.Caddyfile, own-cert.Caddyfile and
+# cloudflare.Caddyfile so that a change to the proxy behaviour cannot reach two of them and miss
+# the third — which is exactly the failure that would leave one deployment's rate limiter keyed on
+# the wrong address.
+#
+# What is NOT here: the `tls` directive, and the two forwarded values that differ per mode. Those
+# are passed in:
+#
+#     import panel_common <client address> <scheme the BROWSER used>
+#
+# landing below as `{args[0]}` and `{args[1]}`. Snippet arguments are substituted when the
+# Caddyfile is adapted, so a placeholder passed in arrives here as itself and is evaluated
+# per-request as usual; a literal like `https` arrives as a literal.
+
+(panel_common) {
+	encode zstd gzip
+
+	# ── The console websocket, BEFORE the catch-all ──────────────────────────────────
+	#
+	# The vSphere console is a websocket proxied by a SEPARATE process, because a
+	# websocket cannot be served from a Next route handler — there is no access to the raw socket
+	# for the upgrade. It lives on this same origin, on this path, so the panel's session cookie
+	# applies without a second origin and no new auth model is needed.
+	#
+	# Without this block the browser dials `wss://<panel>/console/ws`, Caddy hands it to `panel`,
+	# Next has no such route, and the console window opens and never connects — with nothing in
+	# any log saying why. That is exactly what a second deployment hit (2026-10-01).
+	#
+	# Caddy upgrades websockets through `reverse_proxy` with no extra configuration; the explicit
+	# `Upgrade`/`Connection` headers nginx needs are not required here and are not set.
+	@console path /console/ws*
+	reverse_proxy @console console-proxy:8787 {
+		# The proxy resolves the session from the cookie and the tenant's ownership from the
+		# database, exactly as the panel does. It needs the client address for the same reason —
+		# its audit rows record it.
+		header_up X-Forwarded-For {args[0]}
+	}
+
+	# Everything else to the panel. No path routing beyond the console: every URL is potentially a
+	# Server Action endpoint, the same reason `src/middleware.ts` matches everything rather than an
+	# allow-list.
+	reverse_proxy panel:3000 {
+		# The panel reads no `X-Forwarded-Host` for security decisions — `PANEL_ORIGIN` is
+		# configuration and `panelPublicUrl()` never consults a header, precisely so a forged Host
+		# cannot widen the CSRF allow-list or redirect an invitation link.
+		#
+		# The SCHEME is passed in rather than taken from `{scheme}` because they diverge in tunnel
+		# mode: this listener is plain `:80` on a private network while the browser is on https
+		# throughout. `{scheme}` there would say `http`, and anything in Next that builds an
+		# absolute URL from it would emit an `http://` link the browser refuses.
+		header_up X-Forwarded-Proto {args[1]}
+
+		# `X-Forwarded-For` IS a trust boundary, unlike the Host. The panel
+		# takes its leftmost entry; the login rate limiter keys on the result and every audit row
+		# records it. This OVERWRITES whatever the client sent — that overwrite is the entire
+		# guarantee, and the caller above decides what it is overwritten with.
+		header_up X-Forwarded-For {args[0]}
+	}
+
+	# The health endpoint is public by design (see the route) but there is no reason to serve it to
+	# the internet: compose checks it from inside the container.
+	@health path /api/health
+	respond @health 404
+
+	log {
+		output stdout
+		format console
+	}
+}

@@ -1,0 +1,63 @@
+# TLS mode: tunnel  (TLS_MODE=tunnel).
+#
+# For a panel reached through a Cloudflare Tunnel. The distinguishing property is what is NOT here:
+#
+#   - no certificate, and no `tls` directive. The browser's TLS terminates at Cloudflare and the
+#     hop from Cloudflare to this host runs inside the tunnel, which `cloudflared` builds itself.
+#   - no `{$PANEL_DOMAIN}` site address, just `:80`. The only thing that can reach this listener is
+#     `cloudflared` on the compose network; matching a hostname as well would add a second place
+#     for a dashboard change to break the deployment.
+#   - **no published ports at all.** `compose.tunnel.yaml` removes them with `!reset`. That is the
+#     whole point of a tunnel: `cloudflared` dials OUT to Cloudflare, so this host needs no inbound
+#     firewall rule, no public address, and nothing listening on the internet to be found.
+#
+# The panel is still not served over plain HTTP to anyone — `PANEL_ORIGIN` stays `https://…`, the
+# session cookie stays `secure`, and the browser only ever speaks to Cloudflare over TLS. The `:80`
+# below is the last hop of a private network, not an exposure.
+#
+# Point the tunnel's ingress at **http://caddy:80** in the Cloudflare dashboard (Zero Trust →
+# Networks → Tunnels → your tunnel → Public Hostname). Not `panel:3000` — see below.
+#
+# ── The client address, and why caddy is still in the chain ──────────────────────────
+#
+# `cloudflared` could reach `panel:3000` directly and skip this container entirely. It must not,
+# and this is the only reason this file exists.
+#
+# `cloudflared` cannot rewrite request headers. It forwards `CF-Connecting-IP` (Cloudflare's, and
+# overwritten by them, so trustworthy) alongside `X-Forwarded-For` (which Cloudflare APPENDS to
+# whatever the client sent, so its leftmost entry — exactly what the panel
+# reads — is chosen by the caller). Pointed straight at the panel, every request would carry an
+# attacker-controlled address into the login rate-limit key and into every audit row.
+#
+# So caddy stays, doing one job: overwrite `X-Forwarded-For` with `CF-Connecting-IP` before the
+# panel sees either. Same rule as cloudflare.Caddyfile, same single line, different reason for
+# trusting the peer.
+#
+# ── What makes the peer trustworthy here ─────────────────────────────────────────────
+#
+# Not an address list. In `cloudflare` mode the guard is Cloudflare's published ranges, because the
+# listener faces the internet. Here nothing faces the internet: with no published ports, the only
+# thing that can open a connection to `:80` is another container on this compose network.
+# REACHABILITY is the guard, and `compose.tunnel.yaml` is where it is enforced.
+#
+# The `private_ranges` check below is therefore not the security boundary — it is a tripwire for
+# the day somebody adds `ports:` back, or runs this config in edge mode by mistake. A public-IP
+# peer means the deployment is not what this file assumes, and refusing is better than quietly
+# trusting a header that is now forgeable.
+#
+# For a real second factor, put Cloudflare Access in front of the hostname (Zero Trust → Access →
+# Applications). That authenticates the person at Cloudflare's edge before the tunnel carries
+# anything, which is a control this panel cannot give itself.
+
+import common.caddy
+
+:80 {
+	@public not remote_ip private_ranges
+	abort @public
+
+	# `https` as a LITERAL, not `{scheme}`. This listener is plain HTTP on a private network but the
+	# browser never was: it spoke to Cloudflare over TLS and the tunnel carried it the rest of the
+	# way. Forwarding `http` here would have Next build `http://` absolute URLs for a page that is
+	# only ever reachable over https.
+	import panel_common {header.CF-Connecting-IP} https
+}

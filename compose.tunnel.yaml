@@ -1,0 +1,21 @@
+# OmniCP — Cloudflare Tunnel (TLS_MODE=tunnel).
+#
+# An extra file, not a replacement. No inbound ports are opened; cloudflared dials out.
+#
+#     docker compose --env-file .env.production \
+#       -f compose.yaml -f compose.tunnel.yaml up -d
+#
+# See INSTALL.md §4, and caddy/tunnel.Caddyfile for what the address headers must be.
+
+services:
+  caddy:
+    ports: !reset []
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    depends_on:
+      - caddy
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN:?TUNNEL_TOKEN is required for the tunnel — see .env.production.example}
+    command: ['tunnel', '--no-autoupdate', 'run']

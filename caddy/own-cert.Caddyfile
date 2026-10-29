@@ -1,0 +1,32 @@
+# TLS mode: own-cert  (TLS_MODE=own-cert).
+#
+# A certificate you already have: a commercial one, one from an internal CA, or one issued by ACME
+# somewhere else. Put two PEM files where TLS_CERT_DIR points (default `./certs`):
+#
+#     certs/panel.crt    the leaf FOLLOWED BY its intermediate chain, in that order
+#     certs/panel.key    the private key, unencrypted, mode 0600
+#
+# The chain matters. A leaf on its own validates in a browser that happens to have cached the
+# intermediate and fails everywhere else — including, silently, in server-to-server `fetch`, which
+# is how the OIDC callback reaches an IdP. Check before deploying:
+#
+#     openssl verify -untrusted certs/panel.crt certs/panel.crt
+#     openssl x509 -noout -enddate -in certs/panel.crt
+#
+# Caddy does NOT renew these. Replace both files and `docker compose restart caddy`. Put a reminder
+# 30 days before expiry: an expired certificate here is a total outage rather than a warning,
+# because the session cookie is `secure` and a browser that refuses the connection never gets one.
+#
+# ── The client address ───────────────────────────────────────────────────────────────
+#
+# Identical to acme mode, and for the same reason: Caddy terminates the browser's connection, so
+# `{remote_host}` is the real client and overwriting discards anything the client tried to claim.
+# The same warning applies — if another proxy sits in front, see cloudflare.Caddyfile.
+
+import common.caddy
+
+{$PANEL_DOMAIN} {
+	tls /certs/panel.crt /certs/panel.key
+
+	import panel_common {remote_host} {scheme}
+}

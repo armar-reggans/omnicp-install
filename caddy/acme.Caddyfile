@@ -1,0 +1,28 @@
+# TLS mode: acme  (TLS_MODE=acme — the default).
+#
+# Caddy gets and renews a certificate from Let's Encrypt automatically. This is the whole reason
+# Caddy is here rather than nginx: the panel REQUIRES https to function at all — the session cookie
+# is `secure` in production — so certificate management is not an optional extra to bolt on later.
+#
+# Requires, and this is the usual reason it fails: PANEL_DOMAIN already resolves to this host, and
+# ports 80 and 443 are reachable from the internet. The HTTP-01 challenge is an inbound request
+# from Let's Encrypt; behind a firewall that drops :80 it never arrives, and Caddy retries forever
+# while serving a self-signed certificate no browser will accept.
+#
+# ── The client address ───────────────────────────────────────────────────────────────
+#
+# Caddy is the edge here — the browser's TCP connection terminates in this container — so
+# `{remote_host}` IS the client, and overwriting `X-Forwarded-For` with it is what makes the value
+# trustworthy: whatever the client sent is discarded before the panel sees it. Without that, a
+# client could send `X-Forwarded-For: 1.2.3.4` and get a fresh login-attempt bucket on every
+# request, which defeats the rate limiter entirely.
+#
+# If ANYTHING sits in front of this Caddy — a load balancer, a CDN, Cloudflare — this mode is
+# wrong: every request would be attributed to that one proxy, so a handful of failed logins from
+# any user would lock out every user. Use cloudflare.Caddyfile, or adapt its trusted-peer guard.
+
+import common.caddy
+
+{$PANEL_DOMAIN} {
+	import panel_common {remote_host} {scheme}
+}
