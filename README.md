@@ -1,9 +1,8 @@
 # OmniCP — deployment files
 
-Everything needed to run OmniCP on one host:
-the compose definitions, the four TLS configurations, and the two scripts. **No source code and
-no credential** — this repository is public precisely so that a new deployment starts with a
-`git clone` and nothing to ask for.
+Everything needed to run OmniCP on one host: the compose definitions, the four TLS
+configurations, and the two scripts. **No source code and no credential** — this repository is
+public precisely so that a new deployment starts with a `git clone` and nothing to ask for.
 
 **Start at [INSTALL.md](INSTALL.md).** About twenty minutes, most of which is DNS.
 
@@ -24,7 +23,7 @@ keeps running.** Nothing here phones home, checks a licence at runtime, or degra
 ## Versions
 
 This repository is tagged with the same release tags as the images, and it is **generated** —
-`v2026.10.29b` of these files is the set that release was built and tested with. Pull requests
+`v2026.10.29c` of these files is the set that release was built and tested with. Pull requests
 cannot be accepted here for that reason; send them to us and they will come back through a
 release. Issues are welcome.
 
