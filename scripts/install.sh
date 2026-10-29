@@ -39,6 +39,35 @@ die_resumable() {
 [[ -f $EXAMPLE ]] || die "$EXAMPLE is missing — run this from inside the deployment checkout."
 [[ -t 0 ]] || die 'this asks questions, so it needs a terminal. Run it interactively.'
 
+project="${COMPOSE_PROJECT_NAME:-$(sed -n 's/^name:[[:space:]]*\([A-Za-z0-9_.-]*\).*/\1/p' compose.yaml | head -1)}"
+project="${project:-$(basename "$PWD")}"
+
+if [[ ! -f $ENV_FILE ]]; then
+  if docker volume inspect "${project}_pgdata" >/dev/null 2>&1; then
+    echo
+    echo "  ✗ a database from an earlier install is still on this host: ${project}_pgdata" >&2
+    cat >&2 <<EOF
+
+  Nothing has been written. Secrets generated now could not open that database, because
+  postgres keeps the password that was used to create it and ignores a new one — the install
+  would get as far as the migrate step and stop on an authentication failure.
+
+  Two ways on, and they are not the same thing:
+
+    keep it   The .env.production that went with it is the only thing that can open it. Put
+              that file back beside this checkout and run this again; nothing is regenerated,
+              and the install resumes.
+
+    drop it   docker compose --env-file $ENV_FILE down -v
+
+              Then run this again. That DELETES the old database and everything in it. If the
+              attempt that left it never finished, there is nothing in it to delete.
+
+EOF
+    exit 1
+  fi
+fi
+
 ask() {   # ask <VAR> <prompt> [default]
   local var="$1" prompt="$2" default="${3:-}" answer
   default="${!var:-$default}"
@@ -259,7 +288,26 @@ step 'pulling the images'
 ok "pulled $(get_var OMNICP_REGISTRY)/omnicp-{panel,tools}:$(get_var OMNICP_VERSION)"
 
 step 'starting'
-"${dc[@]}" up -d </dev/null || die_resumable 'the stack did not come up. `docker compose ... logs` has the reason.'
+if ! "${dc[@]}" up -d </dev/null; then
+  echo
+  echo '  the end of the migrate log, which is where this usually stops:'
+  migrate_log="$("${dc[@]}" logs --tail 25 migrate </dev/null 2>&1)"
+  printf '%s\n' "$migrate_log" | sed 's/^/      /' >&2
+
+  if grep -q 'P1000' <<<"$migrate_log"; then
+    cat >&2 <<EOF
+
+  P1000 is postgres refusing the password in DATABASE_URL, and on an install that has never
+  worked it is almost always a ${project:-<project>}_pgdata volume left by an earlier attempt:
+  postgres keeps the password its data directory was created with and ignores a new one.
+  Either put the .env.production that went with THAT database back here, or delete it:
+
+      docker compose --env-file $ENV_FILE down -v
+
+EOF
+  fi
+  die_resumable 'the stack did not come up.'
+fi
 
 printf '  waiting for the panel to answer'
 answered=''
