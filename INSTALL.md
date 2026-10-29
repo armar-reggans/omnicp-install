@@ -19,7 +19,7 @@ Two things. Ask if you are missing either; neither can be obtained without us.
 | **A version to install** | An exact release tag, e.g. `v2026.10.29b`. There is no `latest` to pull and never will be. |
 
 You do **not** need access to the OmniCP source repository. The deployment files — this
-document, `compose.yaml`, the Caddy configurations and the two scripts — are published openly
+document, `compose.yaml`, the Caddy configurations and the three scripts — are published openly
 at [`armar-reggans/omnicp-install`](https://github.com/armar-reggans/omnicp-install) and clone
 with no credential at all.
 
@@ -85,10 +85,9 @@ Read the matching file in `caddy/` before using anything but the default.
 ## 5. Get the files and configure
 
 ```bash
-git clone --branch v2026.10.29b \
+git clone --branch v2026.10.29c \
   https://github.com/armar-reggans/omnicp-install.git /opt/docker/omnicp
 cd /opt/docker/omnicp
-cp .env.production.example .env.production
 ```
 
 That repository is public and holds nothing but these deployment files — no source, no
@@ -99,6 +98,32 @@ happens to be newest.
 Cloning a tag leaves git in *detached HEAD*, which is correct here and is not something to fix:
 this host runs a pinned release and has no commits of its own. `scripts/update.sh` moves the
 checkout to the next tag for you when you upgrade.
+
+### The short way
+
+```bash
+./scripts/install.sh
+```
+
+It asks for the hostname, how TLS is terminated, the release tag and the first administrator;
+it **generates** `POSTGRES_PASSWORD` and `PANEL_ENCRYPTION_KEY`, because neither should ever
+be a human's choice. Then it writes `.env.production` from the example — with every one of its
+explanations still in it — runs the preflight checks, logs in to the registry if you have not
+already, pulls, starts the stack and creates that administrator.
+
+It is safe to run twice, and that is the point rather than a nicety: an `.env.production` that
+already exists is read and **never rewritten**, so an install that failed at the pull resumes
+instead of starting over with secrets that no longer match the database it created.
+
+The rest of this section and the next one are what it does. Read them if this deployment needs
+to differ from what the script assumes, or if you would rather do it by hand — the two routes
+end in the same place, and the script is not doing anything you could not.
+
+### By hand
+
+```bash
+cp .env.production.example .env.production
+```
 
 Every variable is explained in that file. Five are required — the stack refuses to start
 without them — plus three that select the registry, which are present but commented out in the
@@ -153,6 +178,8 @@ Errors stop it; warnings do not.
 ---
 
 ## 6. Bring it up
+
+`./scripts/install.sh` has already done everything in this section. Skip to §7.
 
 ```bash
 docker login ghcr.io -u <the username we gave you>   # paste the token, not a password

@@ -1,17 +1,22 @@
 # OmniCP — deployment files
 
 Everything needed to run OmniCP on one host: the compose definitions, the four TLS
-configurations, and the two scripts. **No source code and no credential** — this repository is
-public precisely so that a new deployment starts with a `git clone` and nothing to ask for.
+configurations, and the three scripts. **No source code and no credential** — this repository
+is public precisely so that a new deployment starts with a `git clone` and nothing to ask
+for.
 
 **Start at [INSTALL.md](INSTALL.md).** About twenty minutes, most of which is DNS.
 
 ```bash
-git clone https://github.com/armar-reggans/omnicp-install.git /opt/docker/omnicp
+git clone --branch v2026.10.29d https://github.com/armar-reggans/omnicp-install.git /opt/docker/omnicp
 cd /opt/docker/omnicp
-cp .env.production.example .env.production   # then fill it in
-./scripts/preflight.sh
+./scripts/install.sh
 ```
+
+`install.sh` asks for the hostname, the TLS mode, the release tag and the first
+administrator, generates the two secrets, and brings the stack up. Everything it does by hand
+is written out step by step in INSTALL.md, which is the reference when a deployment needs to
+differ.
 
 ## What you still need from us
 
@@ -23,7 +28,7 @@ keeps running.** Nothing here phones home, checks a licence at runtime, or degra
 ## Versions
 
 This repository is tagged with the same release tags as the images, and it is **generated** —
-`v2026.10.29c` of these files is the set that release was built and tested with. Pull requests
+`v2026.10.29d` of these files is the set that release was built and tested with. Pull requests
 cannot be accepted here for that reason; send them to us and they will come back through a
 release. Issues are welcome.
 
