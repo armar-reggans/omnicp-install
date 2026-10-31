@@ -16,7 +16,7 @@ Two things. Ask if you are missing either; neither can be obtained without us.
 | | What it is |
 |---|---|
 | **A registry token** | A read-only GitHub token for `ghcr.io`. This is how you receive images, and it is the thing a subscription controls. |
-| **A version to install** | An exact release tag, e.g. `v2026.10.31`. There is no `latest` to pull and never will be. |
+| **A version to install** | An exact release tag, e.g. `v2026.10.31a`. There is no `latest` to pull and never will be. |
 
 You do **not** need access to the OmniCP source repository. The deployment files — this
 document, `compose.yaml`, the Caddy configurations and the three scripts — are published openly
@@ -85,7 +85,7 @@ Read the matching file in `caddy/` before using anything but the default.
 ## 5. Get the files and configure
 
 ```bash
-git clone --branch v2026.10.31 \
+git clone --branch v2026.10.31a \
   https://github.com/armar-reggans/omnicp-install.git /opt/docker/omnicp
 cd /opt/docker/omnicp
 ```
@@ -145,7 +145,7 @@ PANEL_PUBLIC_URL=https://panel.example.com
 # Receive images rather than build them.
 OMNICP_SOURCE=pull
 OMNICP_REGISTRY=ghcr.io/armar-reggans
-OMNICP_VERSION=v2026.10.31
+OMNICP_VERSION=v2026.10.31a
 ```
 
 Generate the two secrets rather than choosing them:
