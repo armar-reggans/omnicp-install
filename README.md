@@ -8,7 +8,7 @@ for.
 **Start at [INSTALL.md](INSTALL.md).** About twenty minutes, most of which is DNS.
 
 ```bash
-git clone --branch v2026.10.31a https://github.com/armar-reggans/omnicp-install.git /opt/docker/omnicp
+git clone --branch v2026.11.01 https://github.com/armar-reggans/omnicp-install.git /opt/docker/omnicp
 cd /opt/docker/omnicp
 ./scripts/install.sh
 ```
@@ -28,7 +28,7 @@ keeps running.** Nothing here phones home, checks a licence at runtime, or degra
 ## Versions
 
 This repository is tagged with the same release tags as the images, and it is **generated** —
-`v2026.10.31a` of these files is the set that release was built and tested with. Pull requests
+`v2026.11.01` of these files is the set that release was built and tested with. Pull requests
 cannot be accepted here for that reason; send them to us and they will come back through a
 release. Issues are welcome.
 

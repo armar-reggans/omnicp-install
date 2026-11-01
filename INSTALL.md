@@ -16,7 +16,7 @@ Two things. Ask if you are missing either; neither can be obtained without us.
 | | What it is |
 |---|---|
 | **A registry token** | A read-only GitHub token for `ghcr.io`. This is how you receive images, and it is the thing a subscription controls. |
-| **A version to install** | An exact release tag, e.g. `v2026.10.31a`. There is no `latest` to pull and never will be. |
+| **A version to install** | An exact release tag, e.g. `v2026.11.01`. There is no `latest` to pull and never will be. |
 
 You do **not** need access to the OmniCP source repository. The deployment files — this
 document, `compose.yaml`, the Caddy configurations and the three scripts — are published openly
@@ -85,7 +85,7 @@ Read the matching file in `caddy/` before using anything but the default.
 ## 5. Get the files and configure
 
 ```bash
-git clone --branch v2026.10.31a \
+git clone --branch v2026.11.01 \
   https://github.com/armar-reggans/omnicp-install.git /opt/docker/omnicp
 cd /opt/docker/omnicp
 ```
@@ -145,7 +145,7 @@ PANEL_PUBLIC_URL=https://panel.example.com
 # Receive images rather than build them.
 OMNICP_SOURCE=pull
 OMNICP_REGISTRY=ghcr.io/armar-reggans
-OMNICP_VERSION=v2026.10.31a
+OMNICP_VERSION=v2026.11.01
 ```
 
 Generate the two secrets rather than choosing them:
@@ -231,7 +231,9 @@ Sign in at `https://panel.example.com` as the administrator you just created.
    Account owners read their own share of that log at `/settings/activity` and can pull it into
    their own SIEM from `/api/v1/activity`. What they are served is what the page shows: no
    provider error codes, no internal method names, no host or datastore names, and your staff
-   named by role rather than by address.
+   named by role rather than by address. `/settings/siem` is the page that tells them how —
+   the endpoint, the field set, a shipper to paste, and directions for the common products —
+   so a question about it has an answer you can link to rather than one you have to write.
 6. **Set prices** at `/admin/prices` if you intend to bill. OmniCP ships with none deliberately:
    usage no price covers is flagged rather than billed at zero, and an invoice carrying unpriced
    hours refuses to issue.
